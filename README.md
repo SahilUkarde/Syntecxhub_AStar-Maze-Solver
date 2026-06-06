@@ -48,7 +48,7 @@ AStar-Maze-Solver/
 ## Installation
 
 1. Clone the repository:
-   git clone https://github.com/SahilUkarde
+   git clone https://github.com/SahilUkarde/Syntecxhub_AStar-Maze-Solver.git
 
 2. Navigate to the project directory:
    cd astar-maze-solver
