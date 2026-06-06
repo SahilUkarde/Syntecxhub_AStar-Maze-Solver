@@ -40,10 +40,11 @@ The algorithm always explores the node with the lowest f(n) value, making it bot
 ## Project Structure
 
 AStar-Maze-Solver/
+├──README.md
+├── algorithm.md
 ├── astar_solver.py
 ├── index.html
-├── algorithm.md
-└── README.md
+└── preview.html
 
 ## Installation
 
