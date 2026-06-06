@@ -77,5 +77,5 @@ Sahil Ukarde
 
 B.E. Information Technology (2025)
 
-Aspiring Software Developer | Web Development | AI & Data Analytics
+Python Developer | Web Development | AI/ML & Data Analytics
 
