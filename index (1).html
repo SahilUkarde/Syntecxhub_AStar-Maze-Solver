@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A* Maze Solver — Interactive Demo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 16px}
+h1{font-size:22px;font-weight:600;margin-bottom:4px;color:#f1f5f9}
+.sub{font-size:13px;color:#94a3b8;margin-bottom:16px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center;justify-content:center}
+button{font-size:13px;padding:6px 16px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;cursor:pointer;transition:background .15s}
+button:hover{background:#334155}
+button.primary{background:#2563eb;border-color:#2563eb;color:#fff}
+button.primary:hover{background:#1d4ed8}
+button:disabled{opacity:.4;cursor:not-allowed}
+select{font-size:13px;padding:6px 12px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#e2e8f0}
+.mode-bar{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;justify-content:center}
+.mode-btn{padding:4px 12px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#94a3b8;cursor:pointer;font-size:12px}
+.mode-btn.active{background:#334155;color:#f1f5f9}
+canvas{display:block;cursor:crosshair;border-radius:10px;border:1px solid #334155}
+.stats{display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;justify-content:center}
+.stat{background:#1e293b;border-radius:8px;padding:8px 16px;min-width:90px;border:1px solid #334155}
+.stat-lbl{font-size:11px;color:#64748b}
+.stat-val{font-size:18px;font-weight:600;color:#f1f5f9}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;font-size:12px;color:#94a3b8;justify-content:center}
+.leg{display:flex;align-items:center;gap:5px}
+.swatch{width:14px;height:14px;border-radius:3px}
+.msg{font-size:13px;margin-top:8px;color:#94a3b8;text-align:center;min-height:20px}
+a.gh{display:inline-block;margin-top:20px;font-size:12px;color:#60a5fa;text-decoration:none}
+a.gh:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<h1>🧩 A* Maze Solver</h1>
+<p class="sub">Click/drag = draw walls · Right-click = erase · Use mode buttons to move S/G</p>
+
+<div class="mode-bar">
+  <span style="font-size:12px;color:#64748b;align-self:center">Mode:</span>
+  <button class="mode-btn active" id="mWall" onclick="setMode('wall')">✏️ Wall</button>
+  <button class="mode-btn" id="mErase" onclick="setMode('erase')">🧹 Erase</button>
+  <button class="mode-btn" id="mStart" onclick="setMode('start')">🟢 Move Start</button>
+  <button class="mode-btn" id="mGoal" onclick="setMode('goal')">🔴 Move Goal</button>
+</div>
+
+<div class="controls">
+  <select id="heuristic">
+    <option value="manhattan">Manhattan</option>
+    <option value="euclidean">Euclidean</option>
+    <option value="chebyshev">Chebyshev</option>
+  </select>
+  <select id="speed">
+    <option value="80">Slow</option>
+    <option value="30" selected>Normal</option>
+    <option value="5">Fast</option>
+    <option value="0">Instant</option>
+  </select>
+  <button class="primary" id="btnSolve" onclick="solve()">▶ Solve</button>
+  <button onclick="stepOnce()">Step</button>
+  <button onclick="resetSearch()">Reset</button>
+  <button onclick="clearAll()">Clear All</button>
+  <button onclick="loadPreset()">Load Maze</button>
+</div>
+
+<canvas id="cv"></canvas>
+<div class="msg" id="msg">Draw walls, then press Solve.</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-lbl">Nodes explored</div><div class="stat-val" id="sExplored">0</div></div>
+  <div class="stat"><div class="stat-lbl">Path length</div><div class="stat-val" id="sPath">—</div></div>
+  <div class="stat"><div class="stat-lbl">f(n) at goal</div><div class="stat-val" id="sFn">—</div></div>
+</div>
+
+<div class="legend">
+  <div class="leg"><div class="swatch" style="background:#22c55e"></div>Start</div>
+  <div class="leg"><div class="swatch" style="background:#ef4444"></div>Goal</div>
+  <div class="leg"><div class="swatch" style="background:#475569"></div>Wall</div>
+  <div class="leg"><div class="swatch" style="background:#1e40af"></div>Open list</div>
+  <div class="leg"><div class="swatch" style="background:#4338ca"></div>Closed list</div>
+  <div class="leg"><div class="swatch" style="background:#fbbf24"></div>Final path</div>
+</div>
+
+<a class="gh" href="https://github.com/YOUR_USERNAME/astar-maze-solver" target="_blank">⭐ View on GitHub</a>
+
+<script>
+const COLS=28,ROWS=20,CELL=24;
+const cv=document.getElementById('cv');
+const ctx=cv.getContext('2d');
+cv.width=COLS*CELL; cv.height=ROWS*CELL;
+const EMPTY=0,WALL=1,START=2,GOAL=3,OPEN=4,CLOSED=5,PATH=6;
+let grid,startR,startC,goalR,goalC,mode='wall',drawing=false,running=false;
+let openSet,closedSet,cameFrom,gScore,fScore,pathCells,explored=0,animTimer,stepGen;
+const COLORS={[EMPTY]:'#0f172a',[WALL]:'#475569',[START]:'#22c55e',[GOAL]:'#ef4444',[OPEN]:'#1e3a8a',[CLOSED]:'#3730a3',[PATH]:'#fbbf24'};
+function initGrid(){grid=Array.from({length:ROWS},()=>new Array(COLS).fill(EMPTY));startR=Math.floor(ROWS/2);startC=2;goalR=Math.floor(ROWS/2);goalC=COLS-3;grid[startR][startC]=START;grid[goalR][goalC]=GOAL;}
+function clearSearchState(){openSet=null;closedSet=null;cameFrom=null;gScore=null;fScore=null;pathCells=null;explored=0;if(animTimer){clearInterval(animTimer);animTimer=null;}stepGen=null;running=false;document.getElementById('sExplored').textContent='0';document.getElementById('sPath').textContent='—';document.getElementById('sFn').textContent='—';document.getElementById('btnSolve').disabled=false;}
+function resetSearch(){clearSearchState();for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){if(grid[r][c]===OPEN||grid[r][c]===CLOSED||grid[r][c]===PATH)grid[r][c]=EMPTY;}grid[startR][startC]=START;grid[goalR][goalC]=GOAL;document.getElementById('msg').textContent='Draw walls, then press Solve.';draw();}
+function clearAll(){clearSearchState();initGrid();document.getElementById('msg').textContent='Draw walls, then press Solve.';draw();}
+function h(r,c){const hr=document.getElementById('heuristic').value,dr=Math.abs(r-goalR),dc=Math.abs(c-goalC);return hr==='manhattan'?dr+dc:hr==='euclidean'?Math.sqrt(dr*dr+dc*dc):Math.max(dr,dc);}
+function*astarGen(){const key=(r,c)=>r*COLS+c;openSet=new Map();closedSet=new Set();gScore=new Map();fScore=new Map();cameFrom=new Map();gScore.set(key(startR,startC),0);const f0=h(startR,startC);fScore.set(key(startR,startC),f0);openSet.set(key(startR,startC),{r:startR,c:startC,f:f0});const nb=(r,c)=>[[1,0],[-1,0],[0,1],[0,-1]].map(([dr,dc])=>[r+dr,c+dc]).filter(([nr,nc])=>nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&grid[nr][nc]!==WALL);while(openSet.size>0){let bk=null,bf=Infinity;for(const[k,v]of openSet)if(v.f<bf){bf=v.f;bk=k;}const cur=openSet.get(bk);openSet.delete(bk);const{r,c}=cur;closedSet.add(key(r,c));explored++;if(r===goalR&&c===goalC){pathCells=[];let k2=key(r,c);while(cameFrom.has(k2)){pathCells.push(k2);k2=cameFrom.get(k2);}pathCells.push(key(startR,startC));yield{done:true,cost:gScore.get(key(goalR,goalC)),fn:bf};return;}if(grid[r][c]!==START&&grid[r][c]!==GOAL)grid[r][c]=CLOSED;for(const[nr,nc]of nb(r,c)){const nk=key(nr,nc);if(closedSet.has(nk))continue;const tg=(gScore.get(key(r,c))??Infinity)+1;if(tg<(gScore.get(nk)??Infinity)){cameFrom.set(nk,key(r,c));gScore.set(nk,tg);const nf=tg+h(nr,nc);fScore.set(nk,nf);if(grid[nr][nc]!==START&&grid[nr][nc]!==GOAL)grid[nr][nc]=OPEN;openSet.set(nk,{r:nr,c:nc,f:nf});}}yield{done:false};}yield{done:true,noPath:true};}
+function finishPath(res){running=false;document.getElementById('btnSolve').disabled=false;if(res.noPath){document.getElementById('msg').textContent='No path found — goal is unreachable!';draw();return;}for(const k of pathCells){const r=Math.floor(k/COLS),c=k%COLS;if(grid[r][c]!==START&&grid[r][c]!==GOAL)grid[r][c]=PATH;}document.getElementById('sPath').textContent=pathCells.length-1;document.getElementById('sFn').textContent=res.fn?.toFixed(1)??'—';document.getElementById('msg').textContent=`✓ Path found! Length: ${pathCells.length-1} steps · Explored: ${explored} nodes`;draw();}
+function solve(){if(running)return;resetSearch();running=true;document.getElementById('btnSolve').disabled=true;stepGen=astarGen();const spd=parseInt(document.getElementById('speed').value);if(spd===0){let res;while(true){res=stepGen.next();if(res.value?.done)break;}document.getElementById('sExplored').textContent=explored;finishPath(res.value);return;}document.getElementById('msg').textContent='Searching…';animTimer=setInterval(()=>{for(let i=0;i<3;i++){const res=stepGen.next();document.getElementById('sExplored').textContent=explored;if(res.value?.done){clearInterval(animTimer);animTimer=null;finishPath(res.value);draw();return;}}draw();},spd);}
+function stepOnce(){if(!stepGen){resetSearch();stepGen=astarGen();running=true;document.getElementById('msg').textContent='Stepping…';}if(animTimer){clearInterval(animTimer);animTimer=null;}const res=stepGen.next();document.getElementById('sExplored').textContent=explored;if(res.value?.done){running=false;finishPath(res.value);}draw();}
+function draw(){ctx.clearRect(0,0,cv.width,cv.height);for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const t=grid[r][c],x=c*CELL,y=r*CELL;ctx.fillStyle=COLORS[t]||'#0f172a';ctx.beginPath();ctx.roundRect(x+1,y+1,CELL-2,CELL-2,3);ctx.fill();if(t===START){ctx.fillStyle='#fff';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('S',x+CELL/2,y+CELL/2+1);}if(t===GOAL){ctx.fillStyle='#fff';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('G',x+CELL/2,y+CELL/2+1);}if(gScore&&(t===OPEN||t===CLOSED||t===PATH)){const g=gScore.get(r*COLS+c);if(g!==undefined){ctx.fillStyle='rgba(255,255,255,0.35)';ctx.font='7px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(g,x+CELL/2,y+CELL/2);}}}ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=0.5;for(let r=0;r<=ROWS;r++){ctx.beginPath();ctx.moveTo(0,r*CELL);ctx.lineTo(COLS*CELL,r*CELL);ctx.stroke();}for(let c=0;c<=COLS;c++){ctx.beginPath();ctx.moveTo(c*CELL,0);ctx.lineTo(c*CELL,ROWS*CELL);ctx.stroke();}}
+function cellAt(e){const rect=cv.getBoundingClientRect(),scaleX=cv.width/rect.width,scaleY=cv.height/rect.height,x=(e.clientX-rect.left)*scaleX,y=(e.clientY-rect.top)*scaleY;return[Math.floor(y/CELL),Math.floor(x/CELL)];}
+function setMode(m){mode=m;['Wall','Erase','Start','Goal'].forEach(x=>document.getElementById('m'+x).classList.toggle('active',x.toLowerCase()===m));}
+function paintCell(e){const[r,c]=cellAt(e);if(r<0||r>=ROWS||c<0||c>=COLS||running)return;const cur=grid[r][c];if(mode==='wall'&&cur!==START&&cur!==GOAL)grid[r][c]=WALL;else if(mode==='erase'&&cur!==START&&cur!==GOAL)grid[r][c]=EMPTY;else if(mode==='start'&&cur!==GOAL){grid[startR][startC]=EMPTY;startR=r;startC=c;grid[r][c]=START;}else if(mode==='goal'&&cur!==START){grid[goalR][goalC]=EMPTY;goalR=r;goalC=c;grid[r][c]=GOAL;}draw();}
+cv.addEventListener('mousedown',e=>{e.preventDefault();drawing=true;paintCell(e);});
+cv.addEventListener('mousemove',e=>{if(drawing)paintCell(e);});
+cv.addEventListener('mouseup',()=>drawing=false);
+cv.addEventListener('mouseleave',()=>drawing=false);
+cv.addEventListener('contextmenu',e=>{e.preventDefault();const[r,c]=cellAt(e);if(r>=0&&r<ROWS&&c>=0&&c<COLS&&grid[r][c]!==START&&grid[r][c]!==GOAL){grid[r][c]=EMPTY;draw();}});
+function loadPreset(){clearAll();const walls=[[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[2,8],[3,8],[4,8],[5,8],[6,8],[7,8],[8,8],[9,8],[10,8],[1,12],[2,12],[3,12],[4,12],[5,12],[6,12],[7,12],[12,4],[13,4],[14,4],[15,4],[16,4],[17,4],[18,4],[12,8],[13,8],[14,8],[15,8],[16,8],[17,8],[11,12],[12,12],[13,12],[14,12],[15,12],[16,12],[17,12],[18,12],[3,16],[4,16],[5,16],[6,16],[7,16],[8,16],[9,16],[10,16],[11,16],[5,20],[6,20],[7,20],[8,20],[9,20],[10,20],[11,20],[12,20],[2,24],[3,24],[4,24],[5,24],[6,24],[7,24],[8,24],[14,20],[15,20],[16,20],[17,20],[18,20],[13,16],[14,16],[15,16],[16,16],[17,16]];for(const[r,c]of walls)if(c<COLS&&r<ROWS&&grid[r][c]===EMPTY)grid[r][c]=WALL;startR=10;startC=1;goalR=10;goalC=COLS-2;for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(grid[r][c]===START||grid[r][c]===GOAL)grid[r][c]=EMPTY;grid[startR][startC]=START;grid[goalR][goalC]=GOAL;document.getElementById('msg').textContent='Preset maze loaded. Press Solve!';draw();}
+initGrid();draw();
+</script>
+</body>
+</html>
