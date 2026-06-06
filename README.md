@@ -44,7 +44,6 @@ AStar-Maze-Solver/
 ├── algorithm.md
 ├── astar_solver.py
 ├── index.html
-└── preview.html
 
 ## Installation
 
