@@ -1,5 +1,7 @@
 # Syntecxhub_AStar-Maze-Solver
 An Artificial Intelligence project that uses the A Search Algorithm to efficiently solve mazes and visualize optimal pathfinding solutions.
+
+#Live Demo: https://sahilukarde.github.io/Syntecxhub_AStar-Maze-Solver/ 
 # A* Maze Solver
 
 ## Overview
